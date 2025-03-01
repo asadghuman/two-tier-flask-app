@@ -1,0 +1,37 @@
+name: Deploy Flask App to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH Key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" > github_key.pem
+          chmod 600 github_key.pem
+
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i github_key.pem ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+            cd /home/${{ secrets.EC2_USERNAME }}/flask-app
+
+            # Pull the latest changes
+            git pull origin main
+
+            # Stop and remove existing containers
+            docker compose down
+
+            # Build and start new containers
+            docker compose up --build -d
+
+            # Remove unused Docker images
+            docker image prune -f
+          EOF
